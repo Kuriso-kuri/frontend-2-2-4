@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import ProductModal from '../../components/ProductModal';
 import './ProductsPage.scss';
 
 const ProductsPage = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    
+    // Состояния для модального окна
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState('create'); // 'create' или 'edit'
+    const [editingProduct, setEditingProduct] = useState(null);
 
     useEffect(() => {
         loadProducts();
@@ -35,11 +41,51 @@ const ProductsPage = () => {
         }
     };
 
+    const handleEdit = (product) => {
+        setModalMode('edit');
+        setEditingProduct(product);
+        setModalOpen(true);
+    };
+
+    const handleCreate = () => {
+        setModalMode('create');
+        setEditingProduct(null);
+        setModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+        setEditingProduct(null);
+    };
+
+    const handleSubmitModal = async (productData) => {
+        try {
+            if (modalMode === 'create') {
+                const newProduct = await api.createProduct(productData);
+                setProducts([...products, newProduct]);
+            } else {
+                const updatedProduct = await api.updateProduct(productData.id, productData);
+                setProducts(products.map(p => 
+                    p.id === productData.id ? updatedProduct : p
+                ));
+            }
+            handleCloseModal();
+        } catch (error) {
+            console.error('Ошибка сохранения:', error);
+            alert('Не удалось сохранить товар');
+        }
+    };
+
     return (
         <div className="page">
             <header className="header">
                 <div className="container">
-                    <h1>🛍️ Интернет-магазин</h1>
+                    <div className="header-content">
+                        <h1>Интернет-магазин</h1>
+                        <button className="btn-create" onClick={handleCreate}>
+                            Добавить товар
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -51,23 +97,50 @@ const ProductsPage = () => {
                         <div className="products-grid">
                             {products.map(product => (
                                 <div key={product.id} className="product-card">
+                                    {product.imageUrl && (
+                                        <img 
+                                            src={product.imageUrl} 
+                                            alt={product.name}
+                                            className="product-image"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                            }}
+                                        />
+                                    )}
                                     <h3>{product.name}</h3>
                                     <p className="category">{product.category}</p>
                                     <p className="description">{product.description}</p>
                                     <p className="price">{product.price} ₽</p>
                                     <p className="stock">В наличии: {product.stock} шт.</p>
-                                    <button 
-                                        className="delete-btn"
-                                        onClick={() => handleDelete(product.id)}
-                                    >
-                                        Удалить
-                                    </button>
+                                    
+                                    <div className="card-actions">
+                                        <button 
+                                            className="edit-btn"
+                                            onClick={() => handleEdit(product)}
+                                        >
+                                            Редактировать
+                                        </button>
+                                        <button 
+                                            className="delete-btn"
+                                            onClick={() => handleDelete(product.id)}
+                                        >
+                                            Удалить
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
             </main>
+
+            <ProductModal
+                open={modalOpen}
+                mode={modalMode}
+                initialProduct={editingProduct}
+                onClose={handleCloseModal}
+                onSubmit={handleSubmitModal}
+            />
         </div>
     );
 };
